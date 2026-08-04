@@ -1,6 +1,11 @@
-# Company Data API ETL & PostgreSQL Analytics Pipeline
+# Company Data API ETL & PostgreSQL Analytics + Next.js App
 
-Проект для извлечения, дедупликации и загрузки данных о компаниях из неструктурированной выгрузки внутреннего API (~1000 записей, 20 JSON-файлов) в СУБД PostgreSQL с автоматическим созданием схемы, индексов и выполнением аналитических SQL-запросов.
+Проект для извлечения, дедупликации и загрузки данных о компаниях из неструктурированной выгрузки внутреннего API (~1000 записей, 20 JSON-файлов) в СУБД PostgreSQL с автоматическим созданием схемы, индексов, аналитическими SQL-запросами и веб-интерфейсом на **Next.js (App Router)**.
+
+---
+
+## 🔗 Ссылка на репозиторий
+👉 **[https://github.com/ArtemChik103/polza-agency-test](https://github.com/ArtemChik103/polza-agency-test)**
 
 ---
 
@@ -8,87 +13,91 @@
 
 ```
 .
-├── data_pack.zip        # Исходный архив с выгрузкой API (page_001.json ... page_020.json)
-├── schema.sql           # Скрипт создания структуры таблицы и индексов PostgreSQL
-├── queries.sql          # 3 аналитических SQL-запроса по заданию
-├── load_data.py         # Python-скрипт ETL (парсинг, дедупликация, загрузка, валидация)
+├── .env.example         # Шаблон переменных окружения для подключения к БД
 ├── docker-compose.yml   # Конфигурация PostgreSQL 16 в Docker
+├── schema.sql           # Скрипт создания структуры таблицы и индексов PostgreSQL
+├── queries.sql          # 3 аналитических SQL-запроса из Задачи 1
+├── load_data.py         # Python-скрипт ETL (парсинг, дедупликация, загрузка, валидация)
 ├── requirements.txt     # Python-зависимости (psycopg2-binary, python-dotenv)
-├── .gitignore           # Исключения для Git
+├── src/
+│   ├── app/
+│   │   ├── api/companies/route.ts  # Route Handler API для получения компаний
+│   │   ├── companies/
+│   │   │   ├── page.tsx            # Server Component маршрута /companies
+│   │   │   ├── SearchFilter.tsx    # Client Component формы поиска и фильтрации
+│   │   │   └── loading.tsx         # Skeleton loader состояние
+│   │   └── page.tsx                # Редирект с главной на /companies
+│   └── lib/
+│       └── db.ts                   # Пул подключений к PostgreSQL (pg)
+├── screenshots/         # Скриншоты проверки веб-интерфейса
+├── capture_screenshots.py # Автоматический Playwright-скрипт тестирования
 └── README.md            # Инструкция по запуску и описание решения
 ```
 
 ---
 
-## 🛠 Архитектура и Схема БД (`schema.sql`)
-
-### Таблица `companies`
-
-| Поле | Тип | Описание |
-| :--- | :--- | :--- |
-| `id` | `VARCHAR(32)` | Первичный ключ компании (например, `c_000001`) |
-| `name` | `VARCHAR(255)` | Название компании |
-| `category` | `VARCHAR(255)` | Категория бизнеса |
-| `city` | `VARCHAR(100)` | Город присутствия |
-| `address` | `TEXT` | Адрес компании |
-| `rating` | `NUMERIC(3, 2)` | Средний рейтинг (может быть `NULL`) |
-| `reviews_count` | `INTEGER` | Количество отзывов (по умолчанию `0`) |
-| `site` | `TEXT` | URL веб-сайта (может быть `NULL`) |
-| `phone` | `VARCHAR(50)` | Номер телефона (может быть `NULL`) |
-| `created_at` | `TIMESTAMPTZ` | Время добавления записи в БД |
+## ⚡ Задача 1: База данных PostgreSQL и ETL
 
 ### 🔍 Дедупликация
-В процессе анализа входных данных было выявлено 1000 записей и 994 уникальных `id` (6 дублирующихся строк: `c_000224`, `c_000254`, `c_000263`, `c_000285`, `c_000367`, `c_000453`).
+В процессе анализа входных данных выявлено 1000 записей и 994 уникальных `id` (6 дублирующихся строк: `c_000224`, `c_000254`, `c_000263`, `c_000285`, `c_000367`, `c_000453`).
 Дедупликация реализована на уровне СУБД с помощью `PRIMARY KEY (id)` и инструкции `ON CONFLICT (id) DO NOTHING`.
 
-### ⚡ Индексы
-1. **`idx_companies_category`** — оптимизирует группировку и фильтрацию по категориям (Запросы №1 и №3).
-2. **`idx_companies_city_reviews_rating`** — составной индекс для агрегации рейтинга по городам с фильтрацией `reviews_count >= 10` (Запрос №2).
-3. **`idx_companies_site`** — частичный индекс (`WHERE site IS NOT NULL`) для быстрой оценки доли компаний с сайтом (Запрос №3).
+### ⚡ Индексы (`schema.sql`)
+1. **`idx_companies_category`** — оптимизирует группировку по категориям.
+2. **`idx_companies_city_reviews_rating`** — составной индекс для агрегации рейтинга по городам с фильтрацией `reviews_count >= 10`.
+3. **`idx_companies_site`** — частичный индекс (`WHERE site IS NOT NULL`) для быстрой оценки доли компаний с сайтом.
 
 ---
 
 ## 📊 Аналитические SQL-запросы (`queries.sql`)
 
-### 1. Топ-5 категорий по числу компаний
-```sql
-SELECT 
-    category AS "Категория",
-    COUNT(*) AS "Количество компаний"
-FROM companies
-GROUP BY category
-ORDER BY COUNT(*) DESC, category ASC
-LIMIT 5;
-```
-
-### 2. Средний рейтинг по городам среди компаний с 10+ отзывами
-```sql
-SELECT 
-    city AS "Город",
-    ROUND(AVG(rating), 2) AS "Средний рейтинг",
-    COUNT(*) AS "Количество компаний (10+ отзывов)"
-FROM companies
-WHERE reviews_count >= 10 
-  AND rating IS NOT NULL
-GROUP BY city
-ORDER BY AVG(rating) DESC, city ASC;
-```
-
-### 3. Доля компаний с сайтом по категориям
-```sql
-SELECT 
-    category AS "Категория",
-    COUNT(*) AS "Всего компаний",
-    COUNT(site) AS "Компаний с сайтом",
-    ROUND(COUNT(site)::NUMERIC / COUNT(*) * 100, 2) AS "Доля с сайтом (%)"
-FROM companies
-GROUP BY category
-ORDER BY ROUND(COUNT(site)::NUMERIC / COUNT(*) * 100, 2) DESC, category ASC;
-```
+1. **Топ-5 категорий по числу компаний**:
+   * *IT-интегратор (94), Оптовая торговля (79), Рекламное агентство (76), Строительная компания (71), Юридические услуги (63)*.
+2. **Средний рейтинг по городам среди компаний с 10+ отзывами**:
+   * *Сочи (4.46), Пермь (4.43), Омск (4.41), Тюмень (4.35), Воронеж (4.33)...*
+3. **Доля компаний с сайтом по категориям**:
+   * *Клининг (88.89%), Ресторан (85.37%), Юридические услуги (84.13%), Производство мебели (82.22%), Автосервис (81.82%)...*
 
 ---
 
-## 🚀 Команда запуска (Quick Start)
+## 💻 Задача 2: Веб-страница на Next.js (App Router)
+
+Маршрут `/companies` предоставляет веб-интерфейс в тёмном стиле (Linear / Dark Tech design language) для просмотра компаний с возможностью поиска по названию и фильтрации по городу.
+
+- **Серверный рендеринг**: Данные выбираются напрямую из PostgreSQL в Server Component (`src/app/companies/page.tsx`) и Route Handler (`src/app/api/companies/route.ts`).
+- **Секреты**: В репозитории отсутствуют секретные данные. Подключение настраивается через файл `.env` (образец предоставлен в `.env.example`).
+
+---
+
+## 🧪 Доказательство работы и тестирование ("Как проверял сам")
+
+> **Как проверял сам:**
+> 1. Запустил dev-сервер Next.js и локальный PostgreSQL контейнер (`docker compose up -d`). Перешел по адресу `http://localhost:3000/companies`, проверив первичную загрузку таблицы из 994 компаний с серверным рендерингом (Server Component).
+> 2. В процессе разработки возник нюанс с типом `searchParams` в Next.js (App Router), так как в свежих версиях Next.js `searchParams` является `Promise`, поэтому добавил корректный `await searchParams` для разбора параметров `search`, `city` и `page`.
+> 3. Проверил интерактивный поиск по названию (ввел "Прайм"), фильтрацию по городу (выбрал "Москва" из выпадающего списка), а также комбинацию обоих фильтров с мгновенным обновлением URL и счетчика найденных записей.
+> 4. Протестировал граничный сценарий несуществующего названия ("NonExistentCompany123") — убедился в корректной работе заглушки пустой выдачи (Empty State) и кликабельности кнопки "Сбросить".
+> 5. Автоматизировал процесс проверки через Playwright, снял 5 скриншотов ключевых состояний интерфейса и выгрузил их в репозиторий в папку `screenshots/`.
+
+### 🖼️ Скриншоты интерфейса
+
+#### 1. Первичный вид таблицы организаций (/companies)
+![Первичная страница](/screenshots/01_initial_companies_list.png)
+
+#### 2. Поиск по названию ("Прайм")
+![Поиск по названию](/screenshots/02_search_by_name.png)
+
+#### 3. Фильтрация по городу ("Москва")
+![Фильтр по городу](/screenshots/03_filter_by_city.png)
+
+#### 4. Заглушка при отсутствии результатов (Empty State)
+![Пустая выдача](/screenshots/04_empty_search_state.png)
+
+#### 5. Сброс фильтров
+![Сброс фильтров](/screenshots/05_reset_filters.png)
+
+---
+
+## 🚀 Инструкция по запуску
 
 ### 1. Клонирование репозитория
 ```bash
@@ -101,27 +110,17 @@ cd polza-agency-test
 docker compose up -d
 ```
 
-### 3. Запуск ETL-скрипта загрузки и проверки данных
+### 3. Загрузка данных в БД (ETL)
 ```bash
 pip install -r requirements.txt
 python load_data.py
 ```
 
-### 4. Выполнение SQL-запросов вручную в Docker
+### 4. Настройка .env и запуск Next.js приложения
 ```bash
-docker exec -i company_postgres psql -U postgres -d company_db -f queries.sql
+cp .env.example .env
+npm install
+npm run dev
 ```
 
----
-
-## ⚙️ Переменные окружения (.env)
-
-При необходимости подключения к внешнему серверу PostgreSQL или Supabase, настройте переменные в `.env`:
-
-```env
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=company_db
-DB_USER=postgres
-DB_PASSWORD=postgres
-```
+Откройте [http://localhost:3000/companies](http://localhost:3000/companies) в браузере.
