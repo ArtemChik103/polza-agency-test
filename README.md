@@ -4,11 +4,6 @@
 
 ---
 
-## Ссылка на репозиторий
- **[https://github.com/ArtemChik103/polza-agency-test](https://github.com/ArtemChik103/polza-agency-test)**
-
----
-
 ## Структура проекта
 
 ```
