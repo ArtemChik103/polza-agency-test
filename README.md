@@ -8,26 +8,26 @@
 
 ```
 .
-├── ANOMALIES.md         # Отчёт об аномалиях в файле review.csv (Задача 3)
-├── .env.example         # Шаблон переменных окружения для подключения к БД
-├── docker-compose.yml   # Конфигурация PostgreSQL 16 в Docker
-├── schema.sql           # Скрипт создания структуры таблицы и индексов PostgreSQL
-├── queries.sql          # 3 аналитических SQL-запроса из Задачи 1
-├── load_data.py         # Python-скрипт ETL для JSON (Задача 1)
-├── load_review.py       # Python-скрипт ETL санитизации и дозагрузки CSV (Задача 3)
-├── requirements.txt     # Python-зависимости (psycopg2-binary, python-dotenv, pandas)
+├── ANOMALIES.md # Отчёт об аномалиях в файле review.csv (Задача 3)
+├── .env.example # Шаблон переменных окружения для подключения к БД
+├── docker-compose.yml # Конфигурация PostgreSQL 16 в Docker
+├── schema.sql # Скрипт создания структуры таблицы и индексов PostgreSQL
+├── queries.sql # 3 аналитических SQL-запроса из Задачи 1
+├── load_data.py # Python-скрипт ETL для JSON (Задача 1)
+├── load_review.py # Python-скрипт ETL санитизации и дозагрузки CSV (Задача 3)
+├── requirements.txt # Python-зависимости (psycopg2-binary, python-dotenv, pandas)
 ├── src/
-│   ├── app/
-│   │   ├── api/companies/route.ts  # Route Handler API для получения компаний
-│   │   ├── companies/
-│   │   │   ├── page.tsx            # Server Component маршрута /companies
-│   │   │   ├── SearchFilter.tsx    # Client Component формы поиска и фильтрации
-│   │   │   └── loading.tsx         # Skeleton loader состояние
-│   │   └── page.tsx                # Редирект с главной на /companies
-│   └── lib/
-│       └── db.ts                   # Пул подключений к PostgreSQL (pg)
-├── screenshots/         # Скриншоты проверки веб-интерфейса (Задача 2)
-└── README.md            # Инструкция по запуску и описание решения
+│ ├── app/
+│ │ ├── api/companies/route.ts # Route Handler API для получения компаний
+│ │ ├── companies/
+│ │ │ ├── page.tsx # Server Component маршрута /companies
+│ │ │ ├── SearchFilter.tsx # Client Component формы поиска и фильтрации
+│ │ │ └── loading.tsx # Skeleton loader состояние
+│ │ └── page.tsx # Редирект с главной на /companies
+│ └── lib/
+│ └── db.ts # Пул подключений к PostgreSQL (pg)
+├── screenshots/ # Скриншоты проверки веб-интерфейса (Задача 2)
+└── README.md # Инструкция по запуску и описание решения
 ```
 
 ---
