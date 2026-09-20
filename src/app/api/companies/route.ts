@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import pool from '@/lib/db';
+import pool, { hasDbConfigured } from '@/lib/db';
+import demoCompanies from '@/lib/demo_companies.json';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -9,46 +10,67 @@ export async function GET(request: Request) {
   const limit = Math.max(1, Math.min(100, parseInt(searchParams.get('limit') || '25', 10)));
   const offset = (page - 1) * limit;
 
-  try {
-    const dataQuery = `
-      SELECT id, name, category, city, address, rating, reviews_count, site, phone
-      FROM companies
-      WHERE ($1::text = '' OR name ILIKE '%' || $1 || '%')
-        AND ($2::text = '' OR city = $2)
-      ORDER BY id ASC
-      LIMIT $3 OFFSET $4;
-    `;
+  if (hasDbConfigured) {
+    try {
+      const dataQuery = `
+        SELECT id, name, category, city, address, rating, reviews_count, site, phone
+        FROM companies
+        WHERE ($1::text = '' OR name ILIKE '%' || $1 || '%')
+          AND ($2::text = '' OR city = $2)
+        ORDER BY id ASC
+        LIMIT $3 OFFSET $4;
+      `;
 
-    const countQuery = `
-      SELECT COUNT(*) AS total
-      FROM companies
-      WHERE ($1::text = '' OR name ILIKE '%' || $1 || '%')
-        AND ($2::text = '' OR city = $2);
-    `;
+      const countQuery = `
+        SELECT COUNT(*) AS total
+        FROM companies
+        WHERE ($1::text = '' OR name ILIKE '%' || $1 || '%')
+          AND ($2::text = '' OR city = $2);
+      `;
 
-    const [dataResult, countResult] = await Promise.all([
-      pool.query(dataQuery, [search, city, limit, offset]),
-      pool.query(countQuery, [search, city]),
-    ]);
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(dataQuery, [search, city, limit, offset]),
+        pool.query(countQuery, [search, city]),
+      ]);
 
-    const total = parseInt(countResult.rows[0].total, 10);
-    const totalPages = Math.ceil(total / limit);
+      const total = parseInt(countResult.rows[0].total, 10);
+      const totalPages = Math.ceil(total / limit);
 
-    return NextResponse.json({
-      success: true,
-      data: dataResult.rows,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages,
-      },
-    });
-  } catch (error: any) {
-    console.error('Error fetching companies:', error);
-    return NextResponse.json(
-      { success: false, error: 'Database error fetching companies' },
-      { status: 500 }
-    );
+      return NextResponse.json({
+        success: true,
+        data: dataResult.rows,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+        },
+      });
+    } catch (error: any) {
+      console.warn('Database error fetching companies, falling back to embedded dataset:', error);
+    }
   }
+
+  // Fallback to embedded dataset
+  const dataset = demoCompanies as any[];
+  const filtered = dataset.filter((c) => {
+    const matchSearch = !search || c.name.toLowerCase().includes(search.toLowerCase());
+    const matchCity = !city || c.city === city;
+    return matchSearch && matchCity;
+  });
+
+  const total = filtered.length;
+  const totalPages = Math.ceil(total / limit);
+
+  return NextResponse.json({
+    success: true,
+    data: filtered.slice(offset, offset + limit),
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+    },
+    fallback: true,
+  });
 }

@@ -1,5 +1,9 @@
 # Company Data API ETL & PostgreSQL Analytics + Next.js App
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel%20Online-black?style=for-the-badge&logo=vercel&logoColor=white)](https://polza-agency-test-theta.vercel.app)
+
+**Онлайн-демонстрация (Vercel):** [https://polza-agency-test-theta.vercel.app](https://polza-agency-test-theta.vercel.app)
+
 Проект для извлечения, дедупликации и загрузки данных о компаниях из неструктурированной выгрузки внутреннего API (~1000 записей, 20 JSON-файлов + CSV-догрузка) в СУБД PostgreSQL с автоматическим созданием схемы, индексов, аналитическими SQL-запросами, обработкой аномалий и веб-интерфейсом на **Next.js (App Router)**.
 
 ---

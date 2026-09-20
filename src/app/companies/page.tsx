@@ -1,4 +1,5 @@
-import pool, { Company } from '@/lib/db';
+import pool, { Company, hasDbConfigured } from '@/lib/db';
+import demoCompanies from '@/lib/demo_companies.json';
 import SearchFilter from './SearchFilter';
 import Link from 'next/link';
 import {
@@ -25,38 +26,64 @@ interface PageProps {
 async function getCompanyData(search: string, city: string, pageNum: number, pageSize: number = 20) {
   const offset = (pageNum - 1) * pageSize;
 
-  const dataQuery = `
-    SELECT id, name, category, city, address, rating, reviews_count, site, phone
-    FROM companies
-    WHERE ($1::text = '' OR name ILIKE '%' || $1 || '%')
-      AND ($2::text = '' OR city = $2)
-    ORDER BY id ASC
-    LIMIT $3 OFFSET $4;
-  `;
+  if (hasDbConfigured) {
+    try {
+      const dataQuery = `
+        SELECT id, name, category, city, address, rating, reviews_count, site, phone
+        FROM companies
+        WHERE ($1::text = '' OR name ILIKE '%' || $1 || '%')
+          AND ($2::text = '' OR city = $2)
+        ORDER BY id ASC
+        LIMIT $3 OFFSET $4;
+      `;
 
-  const countQuery = `
-    SELECT COUNT(*) AS total
-    FROM companies
-    WHERE ($1::text = '' OR name ILIKE '%' || $1 || '%')
-      AND ($2::text = '' OR city = $2);
-  `;
+      const countQuery = `
+        SELECT COUNT(*) AS total
+        FROM companies
+        WHERE ($1::text = '' OR name ILIKE '%' || $1 || '%')
+          AND ($2::text = '' OR city = $2);
+      `;
 
-  const citiesQuery = `
-    SELECT DISTINCT city
-    FROM companies
-    ORDER BY city ASC;
-  `;
+      const citiesQuery = `
+        SELECT DISTINCT city
+        FROM companies
+        ORDER BY city ASC;
+      `;
 
-  const [dataRes, countRes, citiesRes] = await Promise.all([
-    pool.query(dataQuery, [search, city, pageSize, offset]),
-    pool.query(countQuery, [search, city]),
-    pool.query(citiesQuery),
-  ]);
+      const [dataRes, countRes, citiesRes] = await Promise.all([
+        pool.query(dataQuery, [search, city, pageSize, offset]),
+        pool.query(countQuery, [search, city]),
+        pool.query(citiesQuery),
+      ]);
 
-  const total = parseInt(countRes.rows[0].total, 10);
+      const total = parseInt(countRes.rows[0].total, 10);
+      const totalPages = Math.ceil(total / pageSize);
+      const cities: string[] = citiesRes.rows.map((r) => r.city);
+      const companies: Company[] = dataRes.rows;
+
+      return {
+        companies,
+        total,
+        totalPages,
+        cities,
+      };
+    } catch (err) {
+      console.warn('PostgreSQL query error, falling back to embedded dataset:', err);
+    }
+  }
+
+  // Fallback to embedded dataset for demonstration without external DB
+  const dataset = demoCompanies as Company[];
+  const filtered = dataset.filter((c) => {
+    const matchSearch = !search || c.name.toLowerCase().includes(search.toLowerCase());
+    const matchCity = !city || c.city === city;
+    return matchSearch && matchCity;
+  });
+
+  const total = filtered.length;
   const totalPages = Math.ceil(total / pageSize);
-  const cities: string[] = citiesRes.rows.map((r) => r.city);
-  const companies: Company[] = dataRes.rows;
+  const cities = Array.from(new Set(dataset.map((c) => c.city))).filter(Boolean).sort();
+  const companies = filtered.slice(offset, offset + pageSize);
 
   return {
     companies,
